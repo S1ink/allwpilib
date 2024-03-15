@@ -184,7 +184,7 @@ std::span<const WebSocket::Frame> TrySendFrames(
       return {frames.data() + (frameStart - frames.begin()),
               frames.data() + (frameEnd - frames.begin())};
 #else
-      return {frameStart, frameEnd};  // <-- this range contains unmanaged buffers still!!! (need to be cleaned up by client)
+      return {frameStart, frameEnd};
 #endif
     } else if (sentBytes < 0) {
       // error
@@ -219,7 +219,7 @@ std::span<const WebSocket::Frame> TrySendFrames(
         return {frames.data() + (frameStart - frames.begin()),
                 frames.data() + (frameEnd - frames.begin())};
 #else
-        return {frameStart, frameEnd};    // <-- this range contains unmanaged buffers still!!! (need to be cleaned up by client)
+        return {frameStart, frameEnd};
 #endif
       }
 
