@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <atomic>
 
 #include <wpi/function_ref.h>
 #include <wpinet/WebSocket.h>
@@ -99,6 +100,7 @@ class WebSocketConnection final
   std::string m_reason;
   uint64_t m_lastFlushTime = 0;
   unsigned int m_version;
+  std::atomic_int64_t m_allocs_tally{ 0 };
 };
 
 }  // namespace nt::net

@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <span>
+#include <iostream>
 
 #include <wpi/Endian.h>
 #include <wpi/Logger.h>
@@ -224,28 +225,22 @@ int WebSocketConnection::Flush() {
         }
       });
   m_ws_frames.clear();
-  if (m_err) {
-    m_frames.clear();
-    for(auto& _buf : m_bufs) {
-      if(_buf.len == 0) {
-        _buf.Deallocate();
-      }
-    }
+  if (m_err) {          // from internal TrySendFrames() ... all referenced buffers should have already been cleaned up
+    m_frames.clear();   // in this case, clearing is fine since all buffers were deallocated
     m_bufs.clear();
     return m_err.code();
   }
 
   int count = 0;
-  for (auto&& frame :
-       wpi::take_back(std::span{m_frames}, unsentFrames.size())) {
-    count += frame.count;
+  if(unsentFrames.size() > 0) {
+    for (auto&& frame :
+        wpi::take_back(std::span{m_frames}, unsentFrames.size())) {
+      ReleaseBufs(std::span{m_bufs}.subspan(frame.start, frame.end - frame.start));
+      count += frame.count;
+    }
+    std::cout << "Alloc tally normalized?: " << m_allocs_tally.load() << std::endl;
   }
   m_frames.clear();
-  for(auto& _buf : m_bufs) {
-    if(_buf.len == 0) {
-      _buf.Deallocate();
-    }
-  }
   m_bufs.clear();
   return count;
 }
@@ -280,22 +275,30 @@ void WebSocketConnection::Disconnect(std::string_view reason) {
 }
 
 wpi::uv::Buffer WebSocketConnection::AllocBuf() {
-  if (!m_buf_pool.empty()) {
-    auto buf = m_buf_pool.back();
-    m_buf_pool.pop_back();
-    return buf;
-  }
+  // if (!m_buf_pool.empty()) {
+  //   auto buf = m_buf_pool.back();
+  //   m_buf_pool.pop_back();
+  //   return buf;
+  // }
+  m_allocs_tally++;
   return wpi::uv::Buffer::Allocate(kAllocSize + 1);  // leave space for ']'
 }
 
 void WebSocketConnection::ReleaseBufs(std::span<wpi::uv::Buffer> bufs) {
-#ifdef __SANITIZE_ADDRESS__
+// #ifdef __SANITIZE_ADDRESS__
   size_t numToPool = 0;
-#else
-  size_t numToPool = (std::min)(bufs.size(), kMaxPoolSize - m_buf_pool.size());
-  m_buf_pool.insert(m_buf_pool.end(), bufs.begin(), bufs.begin() + numToPool);
-#endif
+// #else
+  // size_t numToPool = (std::min)(bufs.size(), kMaxPoolSize - m_buf_pool.size());
+  // m_buf_pool.insert(m_buf_pool.end(), bufs.begin(), bufs.begin() + numToPool);
+// #endif
   for (auto&& buf : bufs.subspan(numToPool)) {
+    m_allocs_tally--;
     buf.Deallocate();
+  }
+  const int64_t v = m_allocs_tally.load();
+  if (v != 0) {
+    std::cout
+        << "Error! WebSocketConnection total allocs: "
+        << v << std::endl;
   }
 }

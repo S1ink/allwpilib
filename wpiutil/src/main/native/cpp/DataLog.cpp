@@ -449,7 +449,7 @@ void DataLog::WriterThreadMain(std::string_view dir) {
     }
 
     // start new file if file exceeds 1.8 GB
-    if (written > 1800000000ull) {
+    if (written > 1000000000ull) {
       state.Close();
       state.IncrementFilename();
       WPI_INFO(m_msglog, "Log file reached 1.8 GB, starting new file '{}'",
