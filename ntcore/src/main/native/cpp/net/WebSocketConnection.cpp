@@ -275,22 +275,22 @@ void WebSocketConnection::Disconnect(std::string_view reason) {
 }
 
 wpi::uv::Buffer WebSocketConnection::AllocBuf() {
-  // if (!m_buf_pool.empty()) {
-  //   auto buf = m_buf_pool.back();
-  //   m_buf_pool.pop_back();
-  //   return buf;
-  // }
+  if (!m_buf_pool.empty()) {
+    auto buf = m_buf_pool.back();
+    m_buf_pool.pop_back();
+    return buf;
+  }
   m_allocs_tally++;
   return wpi::uv::Buffer::Allocate(kAllocSize + 1);  // leave space for ']'
 }
 
 void WebSocketConnection::ReleaseBufs(std::span<wpi::uv::Buffer> bufs) {
-// #ifdef __SANITIZE_ADDRESS__
+#ifdef __SANITIZE_ADDRESS__
   size_t numToPool = 0;
-// #else
-  // size_t numToPool = (std::min)(bufs.size(), kMaxPoolSize - m_buf_pool.size());
-  // m_buf_pool.insert(m_buf_pool.end(), bufs.begin(), bufs.begin() + numToPool);
-// #endif
+#else
+  size_t numToPool = (std::min)(bufs.size(), kMaxPoolSize - m_buf_pool.size());
+  m_buf_pool.insert(m_buf_pool.end(), bufs.begin(), bufs.begin() + numToPool);
+#endif
   for (auto&& buf : bufs.subspan(numToPool)) {
     m_allocs_tally--;
     buf.Deallocate();
